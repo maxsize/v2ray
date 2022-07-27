@@ -193,7 +193,7 @@ v2ray_port_config() {
 		tls_config
 		;;
 	*)
-		local random="24082"
+		local random=24082
 		# while :; do
 		# 	echo -e "请输入 "$yellow"V2Ray"$none" 端口 ["$magenta"1-65535"$none"]"
 		# 	read -p "$(echo -e "(默认端口: ${cyan}${random}$none):")" v2ray_port
