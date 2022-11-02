@@ -10,7 +10,7 @@ none='\e[0m'
 # Root
 [[ $(id -u) != 0 ]] && echo -e " Please use ${red}root ${none}user to run ${yellow}~(^_^) ${none}" && exit 1
 
-_version="v3.52"
+_version="v3.65"
 
 cmd="apt-get"
 
@@ -84,16 +84,42 @@ v2ray_client_config="/etc/v2ray/233blog_v2ray_config.json"
 v2ray_pid=$(pgrep -f /usr/bin/v2ray/v2ray)
 caddy_pid=$(pgrep -f /usr/local/bin/caddy)
 _v2ray_sh="/usr/local/sbin/v2ray"
-v2ray_ver="$(/usr/bin/v2ray/v2ray -version | head -n 1 | cut -d " " -f2)"
+
+/usr/bin/v2ray/v2ray -version >/dev/null 2>&1
+if [[ $? == 0 ]]; then
+	v2ray_ver="$(/usr/bin/v2ray/v2ray -version | head -n 1 | cut -d " " -f2)"
+else
+	v2ray_ver="$(/usr/bin/v2ray/v2ray version | head -n 1 | cut -d " " -f2)"
+	v2ray_ver_v5=1
+fi
+
 . /etc/v2ray/233boy/v2ray/src/init.sh
 systemd=true
 # _test=true
 
 # fix VMessAEAD
-if [[ ! $(grep 'v2ray.vmess.aead.forced=false' /lib/systemd/system/v2ray.service) ]]; then
-	sed -i 's|ExecStart=|ExecStart=/usr/bin/env v2ray.vmess.aead.forced=false |' /lib/systemd/system/v2ray.service
+if [[ ! $(grep 'run -config' /lib/systemd/system/v2ray.service)  && $v2ray_ver_v5 ]]; then
+	_load download-v2ray.sh
+	_install_v2ray_service
 	systemctl daemon-reload
 	systemctl restart v2ray
+fi
+
+# fix caddy2 config
+if [[ $caddy ]]; then
+	/usr/local/bin/caddy version >/dev/null 2>&1
+	if [[ $? == 1 ]]; then
+		echo -e "\n $yellow 警告: 脚本将自动更新 Caddy 版本。 $none  \n"
+		systemctl stop caddy
+		_load download-caddy.sh
+		_download_caddy_file
+		_install_caddy_service
+		systemctl daemon-reload
+		_load caddy-config.sh
+		systemctl restart caddy
+		echo -e "\n $green 更新 Caddy 版本完成, 要是出问题了你可以重装解决。 $none  \n"
+		exit 0
+	fi
 fi
 
 if [[ $v2ray_ver != v* ]]; then
@@ -1737,7 +1763,7 @@ change_proxy_site_config() {
 }
 domain_check() {
 	# test_domain=$(dig $new_domain +short)
-	test_domain=$(ping $new_domain -c 1 -4 -W 2| grep -oE -m1 "([0-9]{1,3}\.){3}[0-9]{1,3}")
+	test_domain=$(ping $new_domain -c 1 -4 -W 2 | grep -oE -m1 "([0-9]{1,3}\.){3}[0-9]{1,3}")
 	# test_domain=$(wget -qO- --header='accept: application/dns-json' "https://cloudflare-dns.com/dns-query?name=$new_domain&type=A" | grep -oE "([0-9]{1,3}\.){3}[0-9]{1,3}" | head -1)
 	# test_domain=$(curl -sH 'accept: application/dns-json' "https://cloudflare-dns.com/dns-query?name=$new_domain&type=A" | grep -oE "([0-9]{1,3}\.){3}[0-9]{1,3}" | head -1)
 	if [[ $test_domain != $ip ]]; then
@@ -2591,8 +2617,6 @@ menu() {
 		echo "TG 频道: https://t.me/tg2333"
 		echo
 		echo "捐赠脚本作者: https://233v2.com/donate/"
-		echo
-		echo "捐助 V2Ray: https://www.v2ray.com/chapter_00/02_donate.html"
 		echo
 		echo -e "$yellow  1. $none查看 V2Ray 配置"
 		echo
